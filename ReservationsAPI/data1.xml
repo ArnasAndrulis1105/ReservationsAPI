@@ -1,0 +1,36 @@
+﻿<Filharmonija>
+	<Hall>
+		<HallId>66</HallId>
+		<Name>test</Name>
+		<TicketCount>10</TicketCount>
+		<HallGroup>
+			<GroupId>41</GroupId>
+			<HallId>66</HallId>
+			<Name>test</Name>
+			<AZ>0</AZ>
+			<HallSeat>
+				<HallGroupId>41</HallGroupId>
+				<ShowSeatId>18597</ShowSeatId>
+				<Color>Red</Color>
+				<Price>0.00</Price>
+				<SeatRow>2</SeatRow>
+				<SeatRowLetter></SeatRowLetter>
+				<SeatNumber>4</SeatNumber>
+				<SeatNumberLetter></SeatNumberLetter>
+				<IsReserved>false</IsReserved>
+			</HallSeat>
+			<HallSeat>
+
+			</HallSeat>
+			<HallSeat>
+
+			</HallSeat>
+		</HallGroup>
+		<HallGroup>
+
+		</HallGroup>
+		<HallGroup>
+
+		</HallGroup>
+	</Hall>
+</Filharmonija>

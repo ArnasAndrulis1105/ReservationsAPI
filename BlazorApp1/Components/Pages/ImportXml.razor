@@ -1,0 +1,81 @@
+﻿@page "/import-xml"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components.Forms
+@inject BlazorApp1.Services.HallsService ImportService
+
+<h3>Import Hall XML</h3>
+
+<div style="max-width:520px; padding:16px; border:1px solid #ddd; border-radius:12px;">
+    <p>Select an XML file and import it to the database.</p>
+
+    <InputFile OnChange="OnFileSelected" accept=".xml" />
+
+    <div style="margin-top:12px;">
+        <button class="btn btn-primary"
+                type="button"
+                @onclick="Upload"
+                disabled="@(!canUpload || isUploading)">
+            @(isUploading ? "Importing..." : "Upload & Import")
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(selectedFileName))
+    {
+        <p style="margin-top:12px;">
+            <b>Selected:</b> @selectedFileName (@(selectedFileSize / 1024.0):0.## KB)
+        </p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(status))
+    {
+        <p style="margin-top:12px; color:@(statusOk ? "green" : "red");">
+            @status
+        </p>
+    }
+</div>
+
+@code {
+    private IBrowserFile? selectedFile;
+    private string? selectedFileName;
+    private long selectedFileSize;
+
+    private bool canUpload => selectedFile is not null;
+    private bool isUploading;
+    private string? status;
+    private bool statusOk;
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        selectedFileName = selectedFile.Name;
+        selectedFileSize = selectedFile.Size;
+
+        status = null;
+        statusOk = false;
+    }
+
+    private async Task Upload()
+    {
+        if (selectedFile is null) return;
+
+        isUploading = true;
+        status = null;
+
+        try
+        {
+            var (ok, message) = await ImportService.UploadXmlAsync(selectedFile);
+            statusOk = ok;
+            status = message;
+        }
+        catch (Exception ex)
+        {
+            statusOk = false;
+            status = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+}

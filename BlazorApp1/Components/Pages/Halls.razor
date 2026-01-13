@@ -1,0 +1,135 @@
+﻿@page "/halls"
+@using BlazorApp1.DTO
+@inject BlazorApp1.Services.HallsService Api
+@rendermode InteractiveServer
+
+<h3>Halls</h3>
+
+@if (isLoading)
+{
+    <p>Loading halls...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <p style="color:red">@error</p>
+}
+else if (halls.Count == 0)
+{
+    <p>No halls found.</p>
+}
+else
+{
+    <div style="display:flex; gap:24px; align-items:flex-start;">
+        <div style="min-width:260px;">
+            <h4>All halls</h4>
+
+            <ul style="list-style:none; padding-left:0;">
+                @foreach (var hall in halls)
+                {
+                    var isSelected = selectedHall?.HallId == hall.HallId;
+
+                    <li style="margin-bottom:8px;">
+                        <button @onclick="() => SelectHall(hall)"
+                                style="width:100%; padding:10px; text-align:left;
+                                               border-radius:8px; border:1px solid #ccc;
+                                               background:@(isSelected ? "#eee" : "white");">
+                            <div><b>@hall.Name</b></div>
+                            <div style="font-size:12px; opacity:.8;">HallId: @hall.HallId • TicketCount: @hall.TicketCount</div>
+                        </button>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div style="flex:1;">
+            @if (selectedHall is null)
+            {
+                <p>Select a hall to see its groups and seats.</p>
+            }
+            else
+            {
+                <h4>Selected: @selectedHall.Name (HallId: @selectedHall.HallId)</h4>
+
+                @if (selectedHall.HallGroups.Count == 0)
+                {
+                    <p>No hall groups.</p>
+                }
+                else
+                {
+                    @foreach (var group in selectedHall.HallGroups)
+                    {
+                        <div style="margin-bottom:18px; padding:12px; border:1px solid #ddd; border-radius:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <b>Group:</b> @group.Name
+                                    <span style="font-size:12px; opacity:.75;">(GroupId: @group.GroupId)</span>
+                                </div>
+                                <div style="font-size:12px; opacity:.75;">Seats: @group.HallSeats.Count</div>
+                            </div>
+
+                            @if (group.HallSeats.Count == 0)
+                            {
+                                <div style="margin-top:8px;">No seats in this group.</div>
+                            }
+                            else
+                            {
+                                <table style="width:100%; margin-top:10px; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="text-align:left; border-bottom:1px solid #ccc;">
+                                            <th style="padding:6px;">HallGroup</th>
+                                            <th style="padding:6px;">ShowSeatId</th>
+                                            <th style="padding:6px;">Color</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var seat in group.HallSeats)
+                                        {
+                                            <tr style="border-bottom:1px solid #eee;">
+                                                <td style="padding:6px;">@group.Name</td>
+                                                <td style="padding:6px;">@seat.ShowSeatId</td>
+                                                <td style="padding:6px;">
+                                                    @seat.Color
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<HallDto> halls = new();
+    private HallDto? selectedHall;
+
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            halls = await Api.GetHallsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load halls: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SelectHall(HallDto hall)
+    {
+        selectedHall = hall;
+    }
+}
+
+

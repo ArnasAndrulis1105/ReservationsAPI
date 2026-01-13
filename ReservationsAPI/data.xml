@@ -1,0 +1,19 @@
+﻿<Filharmonija>
+	<Hall>
+	<HallId>1</HallId>
+	<Name>test</Name>
+	<TicketCount>10</TicketCount>
+	<HallGroup>
+		<GroupId>1</GroupId>
+		<HallId>1</HallId>
+		<Name>test</Name>
+		<AZ>0</AZ>
+		<HallSeat>
+			<HallGroupId>1</HallGroupId>
+			<ShowSeatId>1</ShowSeatId>
+			<Color>Red</Color>
+			<IsReserved>true</IsReserved>
+		</HallSeat>
+	</HallGroup>
+	</Hall>
+</Filharmonija>

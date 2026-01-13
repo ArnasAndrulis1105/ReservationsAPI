@@ -1,0 +1,59 @@
+﻿@page "/import-xml"
+@inject HttpClient Http
+
+<h3>Import XML</h3>
+
+<InputFile OnChange="OnFileSelected" />
+<br />
+<br />
+<button @onclick="UploadFile" disabled="@(!isFileSelected)">Upload XML</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    private IBrowserFile selectedFile;
+    private bool isFileSelected = false;
+    private string message;
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        isFileSelected = selectedFile != null;
+        message = null;
+    }
+
+    private async Task UploadFile()
+    {
+        if (selectedFile == null)
+        {
+            message = "No file selected!";
+            return;
+        }
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024)); // 10 MB limit
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(selectedFile.ContentType);
+            content.Add(streamContent, "file", selectedFile.Name);
+
+            var response = await Http.PostAsync("https://localhost:5148/api/import/xml", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = "XML imported successfully!";
+            }
+            else
+            {
+                message = $"Error importing XML: {response.ReasonPhrase}";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Exception: {ex.Message}";
+        }
+    }
+}
