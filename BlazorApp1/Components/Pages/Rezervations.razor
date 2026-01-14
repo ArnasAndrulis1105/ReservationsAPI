@@ -45,6 +45,23 @@
     }
     else
     {
+        <div style="margin-top:16px; padding:12px; border:1px solid #ddd; border-radius:10px; max-width:520px;">
+            <h4>Vietos paieška</h4>
+
+            <label>Tiksli vieta (ShowSeatId arba "Grupė:ShowSeatId")</label><br />
+            <input style="width:100%; padding:8px;"
+                   @bind="SeatSearch"
+                   @bind:event="oninput"
+                   placeholder="Pvz: 12  arba  VIP:12" />
+
+            @if (!string.IsNullOrWhiteSpace(searchResult))
+            {
+                <p style="margin-top:10px; font-weight:600; color:@(searchOk ? "green" : "red");">
+                    @searchResult
+                </p>
+            }
+        </div>
+
         <table style="width:100%; border-collapse:collapse;">
             <thead>
                 <tr style="text-align:left; border-bottom:1px solid #ccc;">
@@ -93,8 +110,24 @@
     private int? selectedHallId;
     private int? selectedEventId;
 
+    private string? seatSearch;
+    private string? searchResult;
+    private bool searchOk;
+
+
     private HashSet<int> selectedSeatIds = new();
     private string? message;
+
+    private string? SeatSearch
+    {
+        get => seatSearch;
+        set
+        {
+            seatSearch = value;
+            EvaluateSeatSearch();
+        }
+    }
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,6 +161,11 @@
         {
             selectedEventId = eventId;
             seats = await Http.GetFromJsonAsync<List<EventSeatDto>>($"api/reservations/seats?eventId={eventId}") ?? new();
+
+            seatSearch = null;
+            searchResult = null;
+            searchOk = false;
+
         }
         else
         {
@@ -161,4 +199,69 @@
         seats = await Http.GetFromJsonAsync<List<EventSeatDto>>($"api/reservations/seats?eventId={selectedEventId.Value}") ?? new();
         selectedSeatIds.Clear();
     }
+
+    private void EvaluateSeatSearch()
+    {
+        searchResult = null;
+        searchOk = false;
+
+        if (selectedEventId is null)
+        {
+            searchResult = "Pirma pasirink renginį.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(seatSearch))
+            return;
+
+        var query = seatSearch.Trim();
+
+        // Leidžiam 2 formatus:
+        // 1) "12" (ShowSeatId)
+        // 2) "VIP:12" (GroupName + ShowSeatId)
+        string? group = null;
+        int? showSeatId = null;
+
+        if (query.Contains(':'))
+        {
+            var parts = query.Split(':', 2);
+            group = parts[0].Trim();
+            if (int.TryParse(parts[1].Trim(), out var id)) showSeatId = id;
+        }
+        else
+        {
+            if (int.TryParse(query, out var id)) showSeatId = id;
+        }
+
+        if (showSeatId is null)
+        {
+            searchResult = "Neteisingas formatas. Naudok pvz: 12 arba VIP:12";
+            return;
+        }
+
+        var match = seats.FirstOrDefault(s =>
+            s.ShowSeatId == showSeatId.Value &&
+            (group is null || string.Equals(s.GroupName ?? "", group, StringComparison.OrdinalIgnoreCase)));
+
+        if (match is null)
+        {
+            searchResult = "Tokia vieta nerasta šiame renginyje / salėje.";
+            return;
+        }
+
+        if (match.IsReserved)
+        {
+            searchResult = $"Vieta {FormatSeat(match)} yra REZERVUOTA.";
+            searchOk = false;
+        }
+        else
+        {
+            searchResult = $"Vieta {FormatSeat(match)} yra LAISVA.";
+            searchOk = true;
+        }
+    }
+
+    private static string FormatSeat(EventSeatDto s)
+        => $"{s.GroupName}:{s.ShowSeatId} (HallSeatId={s.HallSeatId}, Color={s.Color})";
+
 }
