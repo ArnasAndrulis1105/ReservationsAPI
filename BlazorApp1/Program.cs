@@ -14,10 +14,10 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddHttpClient("Backend", client =>
 {
     client.BaseAddress = new Uri("http://localhost:5148/");
-    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 });
 
-builder.Services.AddScoped<HallsService>();
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Backend"));
 
 
 var app = builder.Build();

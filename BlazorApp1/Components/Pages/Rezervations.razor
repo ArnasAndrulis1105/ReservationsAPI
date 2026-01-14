@@ -1,0 +1,164 @@
+﻿@page "/reservations"
+@using BlazorApp1.DTO
+@using BlazorApp1.DTO.Event
+@rendermode InteractiveServer
+@inject HttpClient Http
+
+<h3>Rezervacijos</h3>
+
+<div style="display:flex; gap:16px; flex-wrap:wrap; align-items:end;">
+    <div>
+        <label>Salė</label><br />
+        <select @onchange="OnHallChanged">
+            <option value="">-- pasirinkti --</option>
+            @foreach (var h in halls)
+            {
+                <option value="@h.HallId">@h.Name</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label>Renginys</label><br />
+        <select @onchange="OnEventChanged" disabled="@(selectedHallId is null)">
+            <option value="">-- pasirinkti --</option>
+            @foreach (var e in events)
+            {
+                <option value="@e.Id">@e.Name (@e.StartsAt.ToString("yyyy-MM-dd HH:mm"))</option>
+            }
+        </select>
+    </div>
+
+    <button type="button" @onclick="Reserve" disabled="@(selectedEventId is null || selectedSeatIds.Count == 0)">
+        Rezervuoti (@selectedSeatIds.Count)
+    </button>
+</div>
+
+@if (selectedEventId is not null)
+{
+    <hr />
+    <h4>Laisvos vietos / užimtos</h4>
+
+    @if (seats.Count == 0)
+    {
+        <p>Nėra vietų.</p>
+    }
+    else
+    {
+        <table style="width:100%; border-collapse:collapse;">
+            <thead>
+                <tr style="text-align:left; border-bottom:1px solid #ccc;">
+                    <th style="padding:6px;">Rezervuoti</th>
+                    <th style="padding:6px;">Grupė</th>
+                    <th style="padding:6px;">HallSeatId</th>
+                    <th style="padding:6px;">ShowSeatId</th>
+                    <th style="padding:6px;">Color</th>
+                    <th style="padding:6px;">Statusas</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in seats.OrderBy(x => x.GroupName).ThenBy(x => x.ShowSeatId))
+                {
+                    var disabled = s.IsReserved;
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:6px;">
+                            <input type="checkbox"
+                                   disabled="@disabled"
+                                   checked="@selectedSeatIds.Contains(s.HallSeatId)"
+                                   @onchange="e => ToggleSeat(s.HallSeatId, (bool)e.Value!)" />
+                        </td>
+                        <td style="padding:6px;">@s.GroupName</td>
+                        <td style="padding:6px;">@s.HallSeatId</td>
+                        <td style="padding:6px;">@s.ShowSeatId</td>
+                        <td style="padding:6px;">@s.Color</td>
+                        <td style="padding:6px;">@(s.IsReserved ? "Užimta" : "Laisva")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <p style="margin-top:10px;">@message</p>
+    }
+}
+
+@code {
+    // čia naudok tavo jau turimą HallDto
+    private List<HallDto> halls = new();
+    private List<EventDto> events = new();
+    private List<EventSeatDto> seats = new();
+
+    private int? selectedHallId;
+    private int? selectedEventId;
+
+    private HashSet<int> selectedSeatIds = new();
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        halls = await Http.GetFromJsonAsync<List<HallDto>>("api/Halls") ?? new();
+    }
+
+    private async Task OnHallChanged(ChangeEventArgs e)
+    {
+        selectedSeatIds.Clear();
+        seats.Clear();
+        selectedEventId = null;
+
+        if (int.TryParse(e.Value?.ToString(), out var hallId))
+        {
+            selectedHallId = hallId;
+            events = await Http.GetFromJsonAsync<List<EventDto>>($"api/events?hallId={hallId}") ?? new();
+        }
+        else
+        {
+            selectedHallId = null;
+            events.Clear();
+        }
+    }
+
+    private async Task OnEventChanged(ChangeEventArgs e)
+    {
+        selectedSeatIds.Clear();
+        message = null;
+
+        if (int.TryParse(e.Value?.ToString(), out var eventId))
+        {
+            selectedEventId = eventId;
+            seats = await Http.GetFromJsonAsync<List<EventSeatDto>>($"api/reservations/seats?eventId={eventId}") ?? new();
+        }
+        else
+        {
+            selectedEventId = null;
+            seats.Clear();
+        }
+    }
+
+    private void ToggleSeat(int hallSeatId, bool isChecked)
+    {
+        if (isChecked) selectedSeatIds.Add(hallSeatId);
+        else selectedSeatIds.Remove(hallSeatId);
+    }
+
+    private async Task Reserve()
+    {
+        if (selectedEventId is null || selectedSeatIds.Count == 0) return;
+
+        var payload = new
+        {
+            EventId = selectedEventId.Value,
+            HallSeatIds = selectedSeatIds.ToList()
+        };
+
+        var res = await Http.PostAsJsonAsync("api/reservations", payload);
+        var body = await res.Content.ReadAsStringAsync();
+
+        message = res.IsSuccessStatusCode ? $"OK: {body}" : $"Klaida: {body}";
+
+        // refresh seat list after reserve
+        seats = await Http.GetFromJsonAsync<List<EventSeatDto>>($"api/reservations/seats?eventId={selectedEventId.Value}") ?? new();
+        selectedSeatIds.Clear();
+    }
+}
