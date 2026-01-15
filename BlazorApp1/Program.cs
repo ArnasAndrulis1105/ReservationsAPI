@@ -19,6 +19,7 @@ builder.Services.AddHttpClient("Backend", client =>
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("Backend"));
 
+builder.Services.AddScoped<HallsService>();
 
 var app = builder.Build();
 

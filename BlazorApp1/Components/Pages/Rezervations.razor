@@ -45,22 +45,56 @@
     }
     else
     {
-        <div style="margin-top:16px; padding:12px; border:1px solid #ddd; border-radius:10px; max-width:520px;">
+        <div style="margin-top:16px; padding:12px; border:1px solid #ddd; border-radius:10px; max-width:720px;">
             <h4>Vietos paieška</h4>
 
-            <label>Tiksli vieta (ShowSeatId arba "Grupė:ShowSeatId")</label><br />
-            <input style="width:100%; padding:8px;"
-                   @bind="SeatSearch"
-                   @bind:event="oninput"
-                   placeholder="Pvz: 12  arba  VIP:12" />
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
+                <div>
+                    <label>HallGroup</label><br />
+                    <select @onchange="OnGroupSearchChanged" disabled="@(groupOptions.Count == 0)">
+                        <option value="">-- visi --</option>
+                        @foreach (var g in groupOptions)
+                        {
+                            <option value="@g" selected="@(g == selectedSearchGroup)">@g</option>
+                        }
+                    </select>
+                </div>
 
-            @if (!string.IsNullOrWhiteSpace(searchResult))
+                <div>
+                    <label>Seat row</label><br />
+                    <input type="number" style="width:120px;"
+                           value="@(searchSeatRow?.ToString() ?? "")"
+                           @oninput="OnRowSearchChanged"
+                           placeholder="pvz 5" />
+                </div>
+
+                <div>
+                    <label>Seat number</label><br />
+                    <input type="number" style="width:140px;"
+                           value="@(searchSeatNumber?.ToString() ?? "")"
+                           @oninput="OnNumberSearchChanged"
+                           placeholder="pvz 12" />
+                </div>
+
+                <button type="button" @onclick="ClearSearch" style="height:32px;">
+                    Clear
+                </button>
+            </div>
+
+            @if (filteredSeats.Count > 0)
             {
-                <p style="margin-top:10px; font-weight:600; color:@(searchOk ? "green" : "red");">
-                    @searchResult
+                <p style="margin-top:10px; font-weight:600;">
+                    Rasta: @filteredSeats.Count vietų (rodoma lentelėje žemiau)
+                </p>
+            }
+            else if (IsSearchActive)
+            {
+                <p style="margin-top:10px; font-weight:600; color:red;">
+                    Pagal pasirinktus kriterijus vietų nerasta.
                 </p>
             }
         </div>
+
 
         <table style="width:100%; border-collapse:collapse;">
             <thead>
@@ -74,7 +108,8 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var s in seats.OrderBy(x => x.GroupName).ThenBy(x => x.ShowSeatId))
+                @foreach (var s in filteredSeats.OrderBy(x => x.GroupName).ThenBy(x => x.SeatRow).ThenBy(x => x.SeatNumber))
+
                 {
                     var disabled = s.IsReserved;
                     <tr style="border-bottom:1px solid #eee;">
@@ -114,6 +149,18 @@
     private string? searchResult;
     private bool searchOk;
 
+    private List<string> groupOptions = new();
+    private string? selectedSearchGroup;
+    private int? searchSeatRow;
+    private int? searchSeatNumber;
+
+    private List<EventSeatDto> filteredSeats = new();
+
+    private bool IsSearchActive =>
+        !string.IsNullOrWhiteSpace(selectedSearchGroup) ||
+        searchSeatRow is not null ||
+        searchSeatNumber is not null;
+
 
     private HashSet<int> selectedSeatIds = new();
     private string? message;
@@ -136,9 +183,12 @@
 
     private async Task OnHallChanged(ChangeEventArgs e)
     {
-        selectedSeatIds.Clear();
-        seats.Clear();
-        selectedEventId = null;
+        groupOptions.Clear();
+        selectedSearchGroup = null;
+        searchSeatRow = null;
+        searchSeatNumber = null;
+        filteredSeats.Clear();
+
 
         if (int.TryParse(e.Value?.ToString(), out var hallId))
         {
@@ -162,9 +212,20 @@
             selectedEventId = eventId;
             seats = await Http.GetFromJsonAsync<List<EventSeatDto>>($"api/reservations/seats?eventId={eventId}") ?? new();
 
-            seatSearch = null;
-            searchResult = null;
-            searchOk = false;
+            // build group dropdown
+            groupOptions = seats
+                .Select(s => s.GroupName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n)
+                .ToList()!;
+
+            // reset search + filtered list
+            selectedSearchGroup = null;
+            searchSeatRow = null;
+            searchSeatNumber = null;
+            ApplyFilters();
+
 
         }
         else
@@ -263,5 +324,55 @@
 
     private static string FormatSeat(EventSeatDto s)
         => $"{s.GroupName}:{s.ShowSeatId} (HallSeatId={s.HallSeatId}, Color={s.Color})";
+
+    private void OnGroupSearchChanged(ChangeEventArgs e)
+    {
+        selectedSearchGroup = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString();
+        ApplyFilters();
+    }
+
+    private void OnRowSearchChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        searchSeatRow = int.TryParse(raw, out var r) ? r : null;
+        ApplyFilters();
+    }
+
+    private void OnNumberSearchChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        searchSeatNumber = int.TryParse(raw, out var n) ? n : null;
+        ApplyFilters();
+    }
+
+    private void ClearSearch()
+    {
+        selectedSearchGroup = null;
+        searchSeatRow = null;
+        searchSeatNumber = null;
+        ApplyFilters();
+    }
+    private void ApplyFilters()
+    {
+        IEnumerable<EventSeatDto> query = seats;
+
+        if (!string.IsNullOrWhiteSpace(selectedSearchGroup))
+        {
+            query = query.Where(s => string.Equals(s.GroupName, selectedSearchGroup, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (searchSeatRow is not null)
+        {
+            query = query.Where(s => s.SeatRow == searchSeatRow.Value);
+        }
+
+        if (searchSeatNumber is not null)
+        {
+            query = query.Where(s => s.SeatNumber == searchSeatNumber.Value);
+        }
+
+        filteredSeats = query.ToList();
+    }
+
 
 }

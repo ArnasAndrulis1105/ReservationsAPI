@@ -24,6 +24,7 @@ namespace ReservationsAPI.Controllers
                     e.Name,
                     e.StartsAt,
                     e.HallId
+
                 })
                 .ToListAsync();
 
